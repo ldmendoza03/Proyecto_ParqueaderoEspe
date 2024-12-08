@@ -83,7 +83,6 @@ bool Parqueadero::salidaAuto(const char* placa) {
     return false;
 }
 
-
 void Parqueadero::imprimirEstado() const {
     printf("\n--- Estado del Parqueadero ---\n");
     if (!inicio) {
@@ -93,12 +92,14 @@ void Parqueadero::imprimirEstado() const {
 
     Nodo* actual = inicio;
     int espacio = 1;
+
     do {
-        printf("Espacio %d: %s (Propietario: %s, Fecha de ingreso: %s)\n",
+        printf("Espacio %d: %s (Propietario: %s, Fecha y hora de ingreso: %s)\n",
                espacio++, actual->vehiculo.getPlaca(),
                actual->vehiculo.getNombrePropietario(),
                actual->vehiculo.getFechaIngreso());
         actual = actual->siguiente;
     } while (actual != inicio);
+
     printf("Capacidad total: %d | Espacios ocupados: %d\n", capacidad, ocupados);
 }
