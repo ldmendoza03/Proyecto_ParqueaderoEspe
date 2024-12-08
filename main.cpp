@@ -72,8 +72,14 @@ void ingresarDatosAuto(Auto& nuevoAuto) {
 
     printf("Ingrese el nombre del propietario: ");
     scanf("%s", nombre);
+    // Limpieza del buffer para evitar conflictos
+    while (getchar() != '\n');
+
     printf("Ingrese la cédula del propietario: ");
     scanf("%s", cedula);
+    // Limpieza del buffer para evitar conflictos
+    while (getchar() != '\n');
+
     printf("Ingrese el correo del propietario: ");
     scanf("%s", correo);
 
@@ -137,8 +143,15 @@ int main() {
                 printf("Ingrese la placa del vehículo: ");
                 scanf("%s", placa);
 
-                if (parqueadero.salidaAuto(placa)) {
-                    printf("Vehículo marcado como salida. Sus datos se conservarán.\n");
+                Auto autoExistente;
+                if (parqueadero.buscarAutoPorPlaca(placa, autoExistente)) {
+                    char fechaHoraSalida[20];
+                    obtenerFechaHora(fechaHoraSalida, sizeof(fechaHoraSalida));
+                    printf("Vehículo salió a las: %s\n", fechaHoraSalida);
+
+                    if (parqueadero.salidaAuto(placa)) {
+                        printf("Vehículo marcado como salida. Sus datos se conservarán.\n");
+                    }
                 } else {
                     printf("Vehículo no encontrado.\n");
                 }
