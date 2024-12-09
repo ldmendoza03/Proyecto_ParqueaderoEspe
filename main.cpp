@@ -21,6 +21,8 @@
 #include <unistd.h>
 #endif
 
+#define ARCHIVO_VEHICULOS "vehiculos.dat"
+
 typedef struct Vehiculo {
     char placa[10];
     char propietario[30];
@@ -111,6 +113,59 @@ int esCorreoValido(const char* correo) {
     return 0;
 }
 
+// Función para cargar los vehículos desde el archivo
+void cargarVehiculosDesdeArchivo(Parqueadero* parqueadero) {
+    FILE* archivo = fopen(ARCHIVO_VEHICULOS, "rb");
+    
+    if (archivo == NULL) {
+        // Si el archivo no existe, lo creamos y cerramos
+        archivo = fopen(ARCHIVO_VEHICULOS, "wb");
+        if (archivo != NULL) {
+            // Archivo creado exitosamente, lo cerramos inmediatamente
+            fclose(archivo);
+        }
+        return; // Retorna, ya que no hay vehículos para cargar
+    }
+
+    Vehiculo vehiculo;
+    while (fread(&vehiculo, sizeof(Vehiculo), 1, archivo)) {
+        Vehiculo* nuevo = (Vehiculo*)malloc(sizeof(Vehiculo));
+        *nuevo = vehiculo;
+        nuevo->siguiente = NULL;
+
+        if (parqueadero->inicio == NULL) {
+            parqueadero->inicio = nuevo;
+        } else {
+            Vehiculo* temp = parqueadero->inicio;
+            while (temp->siguiente != NULL) {
+                temp = temp->siguiente;
+            }
+            temp->siguiente = nuevo;
+        }
+        parqueadero->ocupados++;
+    }
+
+    fclose(archivo);
+}
+
+
+// Función para guardar los vehículos en el archivo
+void guardarVehiculosEnArchivo(Parqueadero* parqueadero) {
+    FILE* archivo = fopen(ARCHIVO_VEHICULOS, "wb");
+    if (archivo == NULL) {
+        printf("No se pudo guardar el archivo de vehículos.\n");
+        return;
+    }
+
+    Vehiculo* actual = parqueadero->inicio;
+    while (actual) {
+        fwrite(actual, sizeof(Vehiculo), 1, archivo);
+        actual = actual->siguiente;
+    }
+
+    fclose(archivo);
+}
+
 // Función para agregar un vehículo al parqueadero
 void agregarVehiculo(Parqueadero* parqueadero, char* placa, char* propietario, char* cedula, char* correo) {
     Vehiculo* nuevo = (Vehiculo*)malloc(sizeof(Vehiculo));
@@ -135,6 +190,9 @@ void agregarVehiculo(Parqueadero* parqueadero, char* placa, char* propietario, c
         temp->siguiente = nuevo;
     }
     parqueadero->ocupados++;
+
+    // Guardamos los vehículos en el archivo después de agregar uno nuevo
+    guardarVehiculosEnArchivo(parqueadero);
 }
 
 // Función para buscar un vehículo por placa
@@ -163,6 +221,9 @@ void registrarSalidaVehiculo(Parqueadero* parqueadero, char* placa) {
             free(actual);
             parqueadero->ocupados--;
             printf("Vehículo con placa %s ha salido del parqueadero.\n", placa);
+
+            // Guardamos los vehículos después de la salida
+            guardarVehiculosEnArchivo(parqueadero);
             return;
         }
         anterior = actual;
@@ -323,7 +384,22 @@ void menu(Parqueadero* parqueadero) {
 
 // Función principal
 int main() {
-    Parqueadero* parqueadero = crearParqueadero(100); // Capacidad de 100 vehículos
+    Parqueadero* parqueadero = crearParqueadero(100); // Asumimos que hay 100 espacios disponibles
+
+    // Cargar vehículos desde el archivo
+    cargarVehiculosDesdeArchivo(parqueadero);
+
+    // Mostrar el menú principal
     menu(parqueadero);
+
+    // Liberar memoria antes de salir
+    Vehiculo* actual = parqueadero->inicio;
+    while (actual) {
+        Vehiculo* siguiente = actual->siguiente;
+        free(actual);
+        actual = siguiente;
+    }
+    free(parqueadero);
+
     return 0;
 }
