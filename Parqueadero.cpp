@@ -1,3 +1,13 @@
+/*******************************************************************************************
+ *            UNIVERSIDAD DE LAS FUERZAS ARMADAS ESPE                                      *
+ * Proposito:                      Programa Estacionamiento ESPE                           *
+ * Autor:                          Leandro Mendoza, Steven Yaydacela                       *
+ * Fecha de creacion:              06/12/2024                                              *
+ * Fecha de modificacion:          09/12/2024                                              *
+ * Materia:                        Estructura de datos                                     *
+ * NRC :                           1978                                                    *
+ ******************************************************************************************/
+
 #include "Parqueadero.h"
 #include <stdio.h>
 #include <stdlib.h>
