@@ -95,11 +95,46 @@ int esNombreValido(const char* nombre) {
 
 int esCedulaValida(const char* cedula) {
     int len = strlen(cedula);
-    if (len != 10) return 0;
+    if (len != 10) return 0; // La cédula debe tener exactamente 10 dígitos
+
+    // Verifica que todos los caracteres sean dígitos
     for (int i = 0; i < len; i++) {
         if (!isdigit(cedula[i])) return 0;
     }
-    return 1;
+
+    // Verifica que los dos primeros dígitos corresponden a una provincia válida (01 - 24)
+    int provincia = (cedula[0] - '0') * 10 + (cedula[1] - '0');
+    if (provincia < 1 || provincia > 24) return 0;
+
+    // Pesos de la validación (según la normativa ecuatoriana)
+    int pesos[9] = {2, 1, 2, 1, 2, 1, 2, 1, 2};
+    int suma = 0;
+
+    // Multiplicación de los primeros 9 dígitos con los pesos
+    for (int i = 0; i < 9; i++) {
+        int digito = cedula[i] - '0';
+        int producto = digito * pesos[i];
+
+        // Si el producto es mayor a 9, sumamos los dígitos del producto
+        if (producto >= 10) {
+            suma += (producto / 10) + (producto % 10);
+        } else {
+            suma += producto;
+        }
+    }
+
+    // Calcula el residuo de la división entre 10
+    int residuo = suma % 10;
+
+    // Si el residuo es 0, el décimo dígito debe ser igual a 0, de lo contrario, debe ser 10 - residuo
+    int digitoVerificador = cedula[9] - '0';
+    if (residuo == 0) {
+        if (digitoVerificador != 0) return 0;
+    } else {
+        if (digitoVerificador != (10 - residuo)) return 0;
+    }
+
+    return 1; // La cédula es válida
 }
 
 int esCorreoValido(const char* correo) {
@@ -320,11 +355,11 @@ void menu(Parqueadero* parqueadero) {
                         } while (!esNombreValido(propietario));
 
                         do {
-                            printf("Ingrese la cedula del propietario: ");
-                            scanf("%s", cedula);
-                            getchar();
+                            printf("Ingrese la cédula del propietario: ");
+                            fgets(cedula, sizeof(cedula), stdin);
+                            cedula[strcspn(cedula, "\n")] = '\0';  // Elimina el salto de línea
                             if (!esCedulaValida(cedula)) {
-                                printf("Cedula invalida. Debe contener10 dígitos.\n");
+                                printf("La cédula ingresada no es válida.\n");
                             }
                         } while (!esCedulaValida(cedula));
 
