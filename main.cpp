@@ -22,6 +22,7 @@
 #endif
 
 #define ARCHIVO_VEHICULOS "vehiculos.dat"
+#define ARCHIVO_HISTORIAL "historial.dat"
 
 typedef struct Vehiculo {
     char placa[10];
@@ -29,6 +30,7 @@ typedef struct Vehiculo {
     char cedula[15];
     char correo[50];
     char fechaHoraIngreso[20];
+    char fechaHoraSalida[20];
     struct Vehiculo* siguiente;
 } Vehiculo;
 
@@ -47,24 +49,123 @@ Parqueadero* crearParqueadero(int capacidad) {
     return parqueadero;
 }
 
-// Función para leer una tecla (para navegar con las flechas)
-#ifdef _WIN32
-int leerTecla() {
-    return _getch(); // Lee una tecla en Windows
+// Función para guardar un vehículo en el historial
+void guardarEnHistorial(Vehiculo* vehiculo) {
+    FILE* archivo = fopen(ARCHIVO_HISTORIAL, "ab");
+    if (archivo == NULL) {
+        printf("No se pudo abrir el archivo de historial.\n");
+        return;
+    }
+    fwrite(vehiculo, sizeof(Vehiculo), 1, archivo);
+    fclose(archivo);
 }
-#else
-int leerTecla() {
-    struct termios oldt, newt;
-    int ch;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    ch = getchar();
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    return ch;
+
+// Función para mostrar el historial
+void mostrarHistorial() {
+    FILE* archivo = fopen(ARCHIVO_HISTORIAL, "rb");
+    if (archivo == NULL) {
+        printf("No hay historial disponible.\n");
+        return;
+    }
+
+    printf("\n--- Historial de Vehiculos ---\n");
+    Vehiculo vehiculo;
+    while (fread(&vehiculo, sizeof(Vehiculo), 1, archivo)) {
+        printf("Placa: %s | Propietario: %s | Fecha y hora de ingreso: %s | Fecha y hora de salida: %s\n",
+               vehiculo.placa, vehiculo.propietario, vehiculo.fechaHoraIngreso,
+               vehiculo.fechaHoraSalida[0] ? vehiculo.fechaHoraSalida : "En parqueadero");
+    }
+    fclose(archivo);
 }
-#endif
+
+// Función para convertir una hora en formato "HH:MM" a minutos desde medianoche
+int convertirHoraAMinutos(const char* hora) {
+    int horas, minutos;
+    sscanf(hora, "%d:%d", &horas, &minutos);
+    return horas * 60 + minutos;
+}
+
+// Función para verificar formato de hora (HH:MM)
+int esHoraValida(const char* hora) {
+    if (strlen(hora) != 5 || hora[2] != ':') return 0;
+    int horas, minutos;
+    if (sscanf(hora, "%d:%d", &horas, &minutos) != 2) return 0;
+    return horas >= 0 && horas < 24 && minutos >= 0 && minutos < 60;
+}
+
+// Función para verificar formato de fecha (YYYY-MM-DD)
+int esFechaValida(const char* fecha) {
+    if (strlen(fecha) != 10 || fecha[4] != '-' || fecha[7] != '-') return 0;
+    int anio, mes, dia;
+    if (sscanf(fecha, "%d-%d-%d", &anio, &mes, &dia) != 3) return 0;
+    if (anio < 1900 || mes < 1 || mes > 12 || dia < 1 || dia > 31) return 0;
+    if ((mes == 4 || mes == 6 || mes == 9 || mes == 11) && dia > 30) return 0;
+    if (mes == 2) {
+        int esBisiesto = (anio % 4 == 0 && (anio % 100 != 0 || anio % 400 == 0));
+        if (dia > 28 + esBisiesto) return 0;
+    }
+    return 1;
+}
+
+// Función para buscar en el historial por rango de hora de ingreso
+void buscarEnHistorialPorHora(const char* horaInicio, const char* horaFin) {
+    if (!esHoraValida(horaInicio) || !esHoraValida(horaFin)) {
+        printf("Formato de hora invalido. Debe ser HH:MM.\n");
+        return;
+    }
+
+    FILE* archivo = fopen(ARCHIVO_HISTORIAL, "rb");
+    if (archivo == NULL) {
+        printf("No hay historial disponible.\n");
+        return;
+    }
+int minutosInicio = convertirHoraAMinutos(horaInicio);
+    int minutosFin = convertirHoraAMinutos(horaFin);
+
+    printf("\n--- Vehiculos en el rango de %s a %s ---\n", horaInicio, horaFin);
+
+    Vehiculo vehiculo;
+    int encontrados = 0;
+
+    while (fread(&vehiculo, sizeof(Vehiculo), 1, archivo)) {
+        char horaIngreso[6];
+        strncpy(horaIngreso, vehiculo.fechaHoraIngreso + 11, 5);
+        horaIngreso[5] = '\0';
+
+        int minutosIngreso = convertirHoraAMinutos(horaIngreso);
+
+        if (minutosIngreso >= minutosInicio && minutosIngreso <= minutosFin) {
+            printf("Placa: %s | Propietario: %s | Fecha y hora de ingreso: %s | Fecha y hora de salida: %s\n",
+                   vehiculo.placa, vehiculo.propietario, vehiculo.fechaHoraIngreso,
+                   vehiculo.fechaHoraSalida[0] ? vehiculo.fechaHoraSalida : "En parqueadero");
+            encontrados++;
+        }
+    }
+
+    if (encontrados == 0) {
+        printf("No se encontraron vehiculos en el rango especificado.\n");
+    }
+
+    fclose(archivo);
+}
+
+void buscarEnHistorialPorFecha(Parqueadero* parqueadero, const char* fecha) {
+    printf("\n--- Búsqueda en Historial por Fecha: %s ---\n", fecha);
+    Vehiculo* actual = parqueadero->inicio;
+    int encontrado = 0;
+    while (actual) {
+        if (strstr(actual->fechaHoraIngreso, fecha) || strstr(actual->fechaHoraSalida, fecha)) {
+            printf("Placa: %s, Propietario: %s, Fecha y hora de ingreso: %s, Fecha y hora de salida: %s\n",
+                   actual->placa, actual->propietario, actual->fechaHoraIngreso, actual->fechaHoraSalida);
+            encontrado = 1;
+        }
+        actual = actual->siguiente;
+    }
+    if (!encontrado) {
+        printf("No se encontraron registros para la fecha proporcionada.\n");
+    }
+}
+
 
 // Función para validar los datos
 int esPlacaValida(const char* placa) {
@@ -151,7 +252,7 @@ int esCorreoValido(const char* correo) {
 // Función para cargar los vehículos desde el archivo
 void cargarVehiculosDesdeArchivo(Parqueadero* parqueadero) {
     FILE* archivo = fopen(ARCHIVO_VEHICULOS, "rb");
-    
+
     if (archivo == NULL) {
         // Si el archivo no existe, lo creamos y cerramos
         archivo = fopen(ARCHIVO_VEHICULOS, "wb");
@@ -228,6 +329,7 @@ void agregarVehiculo(Parqueadero* parqueadero, char* placa, char* propietario, c
 
     // Guardamos los vehículos en el archivo después de agregar uno nuevo
     guardarVehiculosEnArchivo(parqueadero);
+
 }
 
 // Función para buscar un vehículo por placa
@@ -248,23 +350,28 @@ void registrarSalidaVehiculo(Parqueadero* parqueadero, char* placa) {
     Vehiculo* anterior = NULL;
     while (actual) {
         if (strcmp(actual->placa, placa) == 0) {
+            time_t t = time(NULL);
+            struct tm* tiempoLocal = localtime(&t);
+            strftime(actual->fechaHoraSalida, sizeof(actual->fechaHoraSalida), "%d/%m/%Y %H:%M", tiempoLocal);
+
+            guardarEnHistorial(actual); // Guardar en el historial
+
             if (anterior) {
                 anterior->siguiente = actual->siguiente;
             } else {
                 parqueadero->inicio = actual->siguiente;
             }
+
             free(actual);
             parqueadero->ocupados--;
             printf("Vehículo con placa %s ha salido del parqueadero.\n", placa);
 
-            // Guardamos los vehículos después de la salida
-            guardarVehiculosEnArchivo(parqueadero);
             return;
         }
         anterior = actual;
         actual = actual->siguiente;
     }
-    printf("No se encontró un vehículo con la placa %s.\n", placa);
+    printf("No se encontrO un vehIculo con la placa %s.\n", placa);
 }
 
 // Función para imprimir el estado del parqueadero
@@ -282,49 +389,157 @@ void imprimirEstadoParqueadero(Parqueadero* parqueadero) {
            parqueadero->capacidad, parqueadero->ocupados);
 }
 
-// Función para mostrar el menú con navegación por flechas
-void menu(Parqueadero* parqueadero) {
+
+
+
+// Función para leer una tecla
+int leerTecla() {
+#ifdef _WIN32
+    return _getch();
+#else
+    struct termios oldt, newt;
+    int ch;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    return ch;
+#endif
+}
+
+void submenuBusqueda(Parqueadero* parqueadero) {
     const char* opciones[] = {
-        "Ingresar vehiculo",
-        "Buscar vehiculo",
-        "Registrar salida de vehiculo",
-        "Imprimir estado del parqueadero",
-        "Salir"
+        "Buscar por placa",
+        "Buscar por fecha",
+        "Buscar por hora",
+        "Regresar al menú principal"
     };
     int numOpciones = sizeof(opciones) / sizeof(opciones[0]);
-    int seleccion = 0; // Índice de la opción seleccionada
+    int seleccion = 0;
 
     while (1) {
-        system("clear || cls"); // Limpia la consola
-        printf("\n--- Menu Parqueadero ---\n");
+        system("clear || cls");
+        printf("\n--- Submenú de Búsqueda ---\n");
         for (int i = 0; i < numOpciones; i++) {
-            if (i == seleccion) {
-                printf(" > %s\n", opciones[i]); // Resalta la opción seleccionada
-            } else {
-                printf("   %s\n", opciones[i]);
-            }
+            printf("%s%s\n", (i == seleccion) ? " > " : "   ", opciones[i]);
         }
 
         int tecla = leerTecla();
 #ifdef _WIN32
-        if (tecla == 224) { // Código inicial para flechas en Windows
+        if (tecla == 224) {
             tecla = leerTecla();
-            if (tecla == 72) { // Flecha arriba
-                seleccion = (seleccion - 1 + numOpciones) % numOpciones;
-            } else if (tecla == 80) { // Flecha abajo
-                seleccion = (seleccion + 1) % numOpciones;
-            }
-        } else if (tecla == 13) { // Enter
+            if (tecla == 72) seleccion = (seleccion - 1 + numOpciones) % numOpciones; // Flecha arriba
+            else if (tecla == 80) seleccion = (seleccion + 1) % numOpciones; // Flecha abajo
+        } else if (tecla == 13) {
 #else
-        if (tecla == '\033') { // Secuencia para flechas en sistemas POSIX
-            leerTecla(); // Ignorar el siguiente carácter '['
+        if (tecla == '\033') {
+            leerTecla();
             tecla = leerTecla();
-            if (tecla == 'A') { // Flecha arriba
-                seleccion = (seleccion - 1 + numOpciones) % numOpciones;
-            } else if (tecla == 'B') { // Flecha abajo
-                seleccion = (seleccion + 1) % numOpciones;
+            if (tecla == 'A') seleccion = (seleccion - 1 + numOpciones) % numOpciones; // Flecha arriba
+            else if (tecla == 'B') seleccion = (seleccion + 1) % numOpciones; // Flecha abajo
+        } else if (tecla == '\n') {
+#endif
+            switch (seleccion) {
+                case 0: {
+                    char placa[10];
+                    printf("Ingrese la placa del vehículo a buscar: ");
+                    scanf("%s", placa);
+                    getchar(); // Consumir salto de línea
+                    Vehiculo* vehiculo = buscarVehiculo(parqueadero, placa);
+                    if (vehiculo) {
+                        printf("Vehículo encontrado: %s (Propietario: %s, Fecha y hora de ingreso: %s)\n",
+                               vehiculo->placa, vehiculo->propietario, vehiculo->fechaHoraIngreso);
+                    } else {
+                        printf("Vehículo no encontrado.\n");
+                    }
+                    printf("Presione cualquier tecla para continuar...\n");
+                    getchar();
+                    break;
+                }
+                case 1: {
+                    char fecha[11];
+                    printf("Ingrese la fecha a buscar (DD/MM/YYYY): ");
+                    scanf("%10s", fecha);
+                    getchar(); // Consumir salto de línea
+                    buscarEnHistorialPorFecha(parqueadero, fecha);
+                    printf("Presione cualquier tecla para continuar...\n");
+                    getchar();
+                    break;
+                }
+                case 2: {
+                    char horaInicio[6], horaFin[6];
+                    printf("Ingrese la hora de inicio (HH:MM): ");
+                    scanf("%5s", horaInicio);
+                    getchar(); // Consumir salto de línea
+                    printf("Ingrese la hora de fin (HH:MM): ");
+                    scanf("%5s", horaFin);
+                    getchar(); // Consumir salto de línea
+
+                    // Validar formato de hora
+                    int hora1, minuto1, hora2, minuto2;
+                    if (sscanf(horaInicio, "%d:%d", &hora1, &minuto1) != 2 || 
+                        sscanf(horaFin, "%d:%d", &hora2, &minuto2) != 2 ||
+                        hora1 < 0 || hora1 > 23 || minuto1 < 0 || minuto1 > 59 ||
+                        hora2 < 0 || hora2 > 23 || minuto2 < 0 || minuto2 > 59) {
+                        printf("Formato de hora inválido. Intente de nuevo.\n");
+                        printf("Presione cualquier tecla para continuar...\n");
+                        getchar();
+                        break;
+                    }
+
+                    buscarEnHistorialPorHora(horaInicio, horaFin);
+                    printf("Presione cualquier tecla para continuar...\n");
+                    getchar();
+                    break;
+                }
+                case 3:
+                    return; // Regresar al menú principal
+                default:
+                    printf("Opción no válida.\n");
+                    break;
             }
-        } else if (tecla == '\n') { // Enter
+        }
+    }
+}
+
+// Función para mostrar el menú
+void menu(Parqueadero* parqueadero) {
+    const char* opciones[] = {
+        "Ingresar vehiculo",
+        "Buscar en Parqueadero",
+        "Registrar salida de vehiculo",
+        "Imprimir estado del parqueadero",
+        "Mostrar historial\n",
+
+        "Salir"
+
+    };
+    int numOpciones = sizeof(opciones) / sizeof(opciones[0]);
+    int seleccion = 0;
+
+    while (1) {
+        system("clear || cls");
+        printf("\n--- Menu Parqueadero ---\n");
+        for (int i = 0; i < numOpciones; i++) {
+            printf("%s%s\n", (i == seleccion) ? " > " : "   ", opciones[i]);
+        }
+
+        int tecla = leerTecla();
+#ifdef _WIN32
+        if (tecla == 224) {
+            tecla = leerTecla();
+            if (tecla == 72) seleccion = (seleccion - 1 + numOpciones) % numOpciones; // Flecha arriba
+            else if (tecla == 80) seleccion = (seleccion + 1) % numOpciones; // Flecha abajo
+        } else if (tecla == 13) {
+#else
+        if (tecla == '\033') {
+            leerTecla();
+            tecla = leerTecla();
+            if (tecla == 'A') seleccion = (seleccion - 1 + numOpciones) % numOpciones; // Flecha arriba
+            else if (tecla == 'B') seleccion = (seleccion + 1) % numOpciones; // Flecha abajo
+        } else if (tecla == '\n') {
 #endif
             switch (seleccion) {
                 case 0: {
@@ -378,17 +593,7 @@ void menu(Parqueadero* parqueadero) {
                     break;
                 }
                 case 1: {
-                    char placa[10];
-                    printf("Ingrese la placa del vehiculo a buscar: ");
-                    scanf("%s", placa);
-                    Vehiculo* vehiculo = buscarVehiculo(parqueadero, placa);
-                    if (vehiculo) {
-                        printf("Vehiculo encontrado: %s (Propietario: %s, Fecha y hora de ingreso: %s)\n",
-                               vehiculo->placa, vehiculo->propietario, vehiculo->fechaHoraIngreso);
-                    } else {
-                        printf("Vehiculo no encontrado.\n");
-                    }
-                    getchar(); // Espera una tecla para continuar
+                    submenuBusqueda(parqueadero);
                     break;
                 }
                 case 2: {
@@ -404,7 +609,12 @@ void menu(Parqueadero* parqueadero) {
                     imprimirEstadoParqueadero(parqueadero);
                     break;
                 }
-                case 4:
+                case 4:{
+                    mostrarHistorial();
+                    printf("");
+                    break;
+                }
+                case 5:
                     printf("Saliendo del programa...\n");
                     return;
                 default:
@@ -417,7 +627,7 @@ void menu(Parqueadero* parqueadero) {
     }
 }
 
-// Función principal
+/// Función principal
 int main() {
     Parqueadero* parqueadero = crearParqueadero(100); // Asumimos que hay 100 espacios disponibles
 
